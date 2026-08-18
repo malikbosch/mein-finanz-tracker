@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { PiggyBank, Calculator, Receipt, Plus, Trash2 } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { PiggyBank, Calculator, Receipt, Plus, Trash2, Download } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('Sparen');
@@ -51,12 +52,11 @@ export default function App() {
 
   // --- AUSGABEN STATE ---
   const [expenses, setExpenses] = useState([
-    { id: 1, month: 1, week: 1, day: 'Montag', amount: 15, category: 'Food/Drinks' },
-    { id: 2, month: 1, week: 1, day: 'Dienstag', amount: 30, category: 'Einkäufe' }
+    { id: 1, month: 'August', week: 1, day: 'Montag', amount: 100, category: 'Food/Drinks' }
   ]);
-  const [newExpense, setNewExpense] = useState({ month: 1, week: 1, day: 'Montag', amount: '', category: 'Food/Drinks' });
+  const [newExpense, setNewExpense] = useState({ month: 'August', week: 1, day: 'Montag', amount: '', category: 'Food/Drinks' });
 
-  // Berechnung Sparen-Akkumulation
+  // Berechnungen
   const calculateAccumulatedSavings = (yearEntries) => {
     let runningTotal = 0;
     return yearEntries.map(entry => {
@@ -84,28 +84,86 @@ export default function App() {
   const totalAusgabenPlan = Number(budget.foodDrinks) + Number(budget.einkaeufe) + Number(budget.seite);
   const reinesSparen = Number(budget.lohn) - totalAusgabenPlan;
 
+  // --- EXPORT FUNKTION (Excel generieren & herunterladen) ---
+  const exportToExcel = () => {
+    const wb = XLSX.utils.book_new();
+
+    // 1. Sparen Tab
+    const flattenSavings = [];
+    Object.keys(savingsData).forEach(year => {
+      const yearWithTotals = calculateAccumulatedSavings(savingsData[year]);
+      yearWithTotals.forEach(item => {
+        flattenSavings.push({
+          Jahr: year,
+          Monat: item.month,
+          'Sparrate (Fr.)': item.savings,
+          'End of Month (Fr.)': item.endOfMonth
+        });
+      });
+    });
+    const wsSparen = XLSX.utils.json_to_sheet(flattenSavings);
+    XLSX.utils.book_append_sheet(wb, wsSparen, 'Sparen');
+
+    // 2. Budget Tab
+    const budgetArray = [
+      { Kategorie: 'Lohn / Einkommen', Betrag: budget.lohn },
+      { Kategorie: 'Food / Drinks', Betrag: budget.foodDrinks },
+      { Kategorie: 'Einkäufe', Betrag: budget.einkaeufe },
+      { Kategorie: 'Seite legen', Betrag: budget.seite },
+      { Kategorie: 'Gesamte Ausgaben Geplant', Betrag: totalAusgabenPlan },
+      { Kategorie: 'Restliches Sparen', Betrag: reinesSparen }
+    ];
+    const wsBudget = XLSX.utils.json_to_sheet(budgetArray);
+    XLSX.utils.book_append_sheet(wb, wsBudget, 'Budget');
+
+    // 3. Ausgaben Tab
+    const formattedExpenses = expenses.map(exp => ({
+      Monat: exp.month,
+      Woche: `Woche ${exp.week}`,
+      Tag: exp.day,
+      Kategorie: exp.category,
+      'Betrag (Fr.)': exp.amount
+    }));
+    const wsAusgaben = XLSX.utils.json_to_sheet(formattedExpenses);
+    XLSX.utils.book_append_sheet(wb, wsAusgaben, 'Ausgaben');
+
+    // Datei speichern
+    XLSX.writeFile(wb, 'Finanz_Tracker_Export.xlsx');
+  };
+
+  const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+
   return (
     <div style={{ fontFamily: 'Segoe UI, sans-serif', backgroundColor: '#1e1e1e', color: '#f1f1f1', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
-      {/* HEADER / NAVIGATION tabs (oben zum Switchen) */}
-      <header style={{ backgroundColor: '#2d2d2d', borderBottom: '1px solid #3c3c3c', padding: '10px 20px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+      {/* HEADER WITH EXPORT BUTTON */}
+      <header style={{ backgroundColor: '#2d2d2d', borderBottom: '1px solid #3c3c3c', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            onClick={() => setActiveTab('Sparen')} 
+            style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: activeTab === 'Sparen' ? '#107c41' : '#3c3c3c', color: 'white', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <PiggyBank size={18} /> Sparen
+          </button>
+          <button 
+            onClick={() => setActiveTab('Budget')} 
+            style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: activeTab === 'Budget' ? '#107c41' : '#3c3c3c', color: 'white', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <Calculator size={18} /> Budget
+          </button>
+          <button 
+            onClick={() => setActiveTab('Ausgaben')} 
+            style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: activeTab === 'Ausgaben' ? '#107c41' : '#3c3c3c', color: 'white', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <Receipt size={18} /> Ausgaben
+          </button>
+        </div>
+
         <button 
-          onClick={() => setActiveTab('Sparen')} 
-          style={{ padding: '10px 20px', borderRadius: '6px', border: 'none', backgroundColor: activeTab === 'Sparen' ? '#107c41' : '#3c3c3c', color: 'white', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}
+          onClick={exportToExcel}
+          style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#0e639c', color: 'white', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}
         >
-          <PiggyBank size={18} /> Sparen
-        </button>
-        <button 
-          onClick={() => setActiveTab('Budget')} 
-          style={{ padding: '10px 20px', borderRadius: '6px', border: 'none', backgroundColor: activeTab === 'Budget' ? '#107c41' : '#3c3c3c', color: 'white', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}
-        >
-          <Calculator size={18} /> Budget
-        </button>
-        <button 
-          onClick={() => setActiveTab('Ausgaben')} 
-          style={{ padding: '10px 20px', borderRadius: '6px', border: 'none', backgroundColor: activeTab === 'Ausgaben' ? '#107c41' : '#3c3c3c', color: 'white', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}
-        >
-          <Receipt size={18} /> Ausgaben
+          <Download size={18} /> Excel Exportieren
         </button>
       </header>
 
@@ -126,8 +184,8 @@ export default function App() {
                       <thead>
                         <tr style={{ borderBottom: '1px solid #3c3c3c', fontSize: '12px', color: '#aaa' }}>
                           <th style={{ padding: '6px' }}>Monat</th>
-                          <th style={{ padding: '6px' }}>Sparrate (€)</th>
-                          <th style={{ padding: '6px' }}>End of Month (€)</th>
+                          <th style={{ padding: '6px' }}>Sparrate (Fr.)</th>
+                          <th style={{ padding: '6px' }}>End of Month</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -142,7 +200,7 @@ export default function App() {
                                 style={{ width: '70px', backgroundColor: '#333', color: '#fff', border: '1px solid #444', borderRadius: '4px', padding: '2px 5px' }}
                               />
                             </td>
-                            <td style={{ padding: '6px', fontWeight: 'bold', color: '#4ec9b0' }}>{row.endOfMonth} €</td>
+                            <td style={{ padding: '6px', fontWeight: 'bold', color: '#4ec9b0' }}>{row.endOfMonth} Fr.</td>
                           </tr>
                         ))}
                       </tbody>
@@ -201,11 +259,11 @@ export default function App() {
               <div style={{ borderTop: '1px solid #3c3c3c', paddingTop: '15px', display: 'flex', justifyContent: 'space-between' }}>
                 <div>
                   <div style={{ fontSize: '12px', color: '#aaa' }}>Insgesamt eingeplante Ausgaben:</div>
-                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#ce9178' }}>{totalAusgabenPlan} €</div>
+                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#ce9178' }}>{totalAusgabenPlan} Fr.</div>
                 </div>
                 <div>
                   <div style={{ fontSize: '12px', color: '#aaa' }}>Restliches Sparen:</div>
-                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#4ec9b0' }}>{reinesSparen} €</div>
+                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#4ec9b0' }}>{reinesSparen} Fr.</div>
                 </div>
               </div>
             </div>
@@ -215,16 +273,16 @@ export default function App() {
         {/* REITER: AUSGABEN */}
         {activeTab === 'Ausgaben' && (
           <div>
-            <h2>Ausgaben nach Wochen & Monaten</h2>
+            <h2>Ausgaben Eintragen & Verwalten</h2>
             
-            {/* Neue Ausgabe hinzufügen */}
+            {/* Formular zum Hinzufügen */}
             <div style={{ backgroundColor: '#252526', padding: '15px', borderRadius: '8px', marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
               <select 
                 value={newExpense.month} 
-                onChange={(e) => setNewExpense({ ...newExpense, month: Number(e.target.value) })}
+                onChange={(e) => setNewExpense({ ...newExpense, month: e.target.value })}
                 style={{ backgroundColor: '#333', color: '#fff', border: '1px solid #444', padding: '8px', borderRadius: '4px' }}
               >
-                {[...Array(12)].map((_, i) => <option key={i+1} value={i+1}>Monat {i+1}</option>)}
+                {monthNames.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
 
               <select 
@@ -246,12 +304,23 @@ export default function App() {
                 {['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'].map(d => <option key={d} value={d}>{d}</option>)}
               </select>
 
+              <select 
+                value={newExpense.category} 
+                onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })}
+                style={{ backgroundColor: '#333', color: '#fff', border: '1px solid #444', padding: '8px', borderRadius: '4px' }}
+              >
+                <option value="Food/Drinks">Food/Drinks</option>
+                <option value="Einkäufe">Einkäufe</option>
+                <option value="Seite legen">Seite legen</option>
+                <option value="Sonstiges">Sonstiges</option>
+              </select>
+
               <input 
                 type="number" 
-                placeholder="Betrag €" 
+                placeholder="Betrag (Fr.)" 
                 value={newExpense.amount} 
                 onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
-                style={{ backgroundColor: '#333', color: '#fff', border: '1px solid #444', padding: '8px', borderRadius: '4px', width: '100px' }}
+                style={{ backgroundColor: '#333', color: '#fff', border: '1px solid #444', padding: '8px', borderRadius: '4px', width: '110px' }}
               />
 
               <button 
@@ -278,11 +347,11 @@ export default function App() {
                 <tbody>
                   {expenses.map(exp => (
                     <tr key={exp.id} style={{ borderBottom: '1px solid #2d2d2d' }}>
-                      <td style={{ padding: '8px' }}>Monat {exp.month}</td>
+                      <td style={{ padding: '8px' }}>{exp.month}</td>
                       <td style={{ padding: '8px' }}>Woche {exp.week}</td>
                       <td style={{ padding: '8px' }}>{exp.day}</td>
                       <td style={{ padding: '8px' }}>{exp.category}</td>
-                      <td style={{ padding: '8px', color: '#f44336', fontWeight: 'bold' }}>-{exp.amount} €</td>
+                      <td style={{ padding: '8px', color: '#f44336', fontWeight: 'bold' }}>-{exp.amount} Fr.</td>
                       <td style={{ padding: '8px' }}>
                         <button onClick={() => deleteExpense(exp.id)} style={{ backgroundColor: 'transparent', border: 'none', color: '#aaa', cursor: 'pointer' }}>
                           <Trash2 size={16} />
@@ -298,7 +367,7 @@ export default function App() {
 
       </main>
 
-      {/* FOOTER TAB-BAR (Exakt wie Excel unten) */}
+      {/* FOOTER TAB-BAR */}
       <footer style={{ backgroundColor: '#252526', borderTop: '1px solid #3c3c3c', display: 'flex', padding: '0 10px' }}>
         <button 
           onClick={() => setActiveTab('Sparen')} 
