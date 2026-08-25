@@ -4,7 +4,7 @@ import { PiggyBank, Calculator, Receipt, Plus, Trash2, Download, Save } from 'lu
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('Sparen');
-  const [isSaved, setIsSaved] = useState(false); // Für visuelles Feedback beim Speichern
+  const [isSaved, setIsSaved] = useState(false);
 
   // --- SPAREN STATE WITH LOCALSTORAGE ---
   const [savingsData, setSavingsData] = useState(() => {
@@ -62,26 +62,51 @@ export default function App() {
     return saved
       ? JSON.parse(saved)
       : [
-          { id: 1, month: 'August', week: 1, day: 'Montag', amount: 100, category: 'Food/Drinks' }
+          { id: 1, month: 'August', day: 1, amount: 100, category: 'Food/Drinks' }
         ];
   });
 
   const [newExpense, setNewExpense] = useState({
     month: 'August',
-    week: 1,
-    day: 'Montag',
+    day: 1,
     amount: '',
     category: 'Food/Drinks'
   });
 
-  // --- AUTOMATISCHES SPEICHERN IM HINTERGRUND ---
+  // MONATSNAMEN
+  const monthNames = [
+    'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
+  ];
+
+  // HILFSFUNKTION: BERECHNET DIE ANZAHL TAGE IM EINGESTELLTEN MONAT
+  const getDaysInMonth = (monthName) => {
+    const monthIndex = monthNames.indexOf(monthName);
+    if (monthIndex === -1) return 31;
+    // Nutzen JavaScript Date-Objekt (Jahr 2026 als Basis)
+    const year = new Date().getFullYear();
+    return new Date(year, monthIndex + 1, 0).getDate();
+  };
+
+  // Wenn der Monat geändert wird, prüfen ob der gewählte Tag noch gültig ist
+  const handleMonthChange = (selectedMonth) => {
+    const maxDays = getDaysInMonth(selectedMonth);
+    const updatedDay = newExpense.day > maxDays ? maxDays : newExpense.day;
+    setNewExpense({
+      ...newExpense,
+      month: selectedMonth,
+      day: updatedDay
+    });
+  };
+
+  // AUTOMATISCHES SPEICHERN IM HINTERGRUND
   useEffect(() => {
     localStorage.setItem('finanz_savings', JSON.stringify(savingsData));
     localStorage.setItem('finanz_budget', JSON.stringify(budget));
     localStorage.setItem('finanz_expenses', JSON.stringify(expenses));
   }, [savingsData, budget, expenses]);
 
-  // --- MANUELLES SPEICHERN FUNKTION ---
+  // MANUELLES SPEICHERN FUNKTION
   const handleManualSave = () => {
     localStorage.setItem('finanz_savings', JSON.stringify(savingsData));
     localStorage.setItem('finanz_budget', JSON.stringify(budget));
@@ -123,12 +148,7 @@ export default function App() {
     Number(budget.foodDrinks) + Number(budget.einkaeufe) + Number(budget.seite);
   const reinesSparen = Number(budget.lohn) - totalAusgabenPlan;
 
-  const monthNames = [
-    'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
-    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
-  ];
-
-  // --- EXPORT FUNKTION (Excel generieren mit dynamischem Monatsnamen) ---
+  // EXPORT FUNKTION
   const exportToExcel = () => {
     const wb = XLSX.utils.book_new();
 
@@ -163,21 +183,24 @@ export default function App() {
     // 3. Ausgaben Tab
     const formattedExpenses = expenses.map((exp) => ({
       Monat: exp.month,
-      Woche: `Woche ${exp.week}`,
-      Tag: exp.day,
+      Tag: `Tag ${exp.day}`,
       Kategorie: exp.category,
       'Betrag (Fr.)': exp.amount
     }));
     const wsAusgaben = XLSX.utils.json_to_sheet(formattedExpenses);
     XLSX.utils.book_append_sheet(wb, wsAusgaben, 'Ausgaben');
 
-    // Aktuellen Monat für Dateinamen bestimmen (z.B. Finanzen-August.xlsx)
     const currentMonth = monthNames[new Date().getMonth()];
     const fileName = `Finanzen-${currentMonth}.xlsx`;
 
-    // Datei speichern
     XLSX.writeFile(wb, fileName);
   };
+
+  // Tage-Array für den ausgewählten Monat generieren (z.B. [1, 2, ..., 30])
+  const daysInCurrentMonth = Array.from(
+    { length: getDaysInMonth(newExpense.month) },
+    (_, i) => i + 1
+  );
 
   return (
     <div
@@ -190,7 +213,7 @@ export default function App() {
         flexDirection: 'column'
       }}
     >
-      {/* HEADER WITH SAVE AND EXPORT BUTTONS */}
+      {/* HEADER */}
       <header
         style={{
           backgroundColor: '#2d2d2d',
@@ -257,7 +280,6 @@ export default function App() {
           </button>
         </div>
 
-        {/* RECHTE SEITE: SPEICHERN + EXCEL EXPORT BUTTONS */}
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <button
             onClick={handleManualSave}
@@ -588,11 +610,10 @@ export default function App() {
                 alignItems: 'center'
               }}
             >
+              {/* Monat auswählen */}
               <select
                 value={newExpense.month}
-                onChange={(e) =>
-                  setNewExpense({ ...newExpense, month: e.target.value })
-                }
+                onChange={(e) => handleMonthChange(e.target.value)}
                 style={{
                   backgroundColor: '#333',
                   color: '#fff',
@@ -608,12 +629,13 @@ export default function App() {
                 ))}
               </select>
 
+              {/* Tag auswählen (1 bis max. Tage des Monats) */}
               <select
-                value={newExpense.week}
+                value={newExpense.day}
                 onChange={(e) =>
                   setNewExpense({
                     ...newExpense,
-                    week: Number(e.target.value)
+                    day: Number(e.target.value)
                   })
                 }
                 style={{
@@ -624,40 +646,14 @@ export default function App() {
                   borderRadius: '4px'
                 }}
               >
-                <option value={1}>Woche 1</option>
-                <option value={2}>Woche 2</option>
-                <option value={3}>Woche 3</option>
-                <option value={4}>Woche 4</option>
-              </select>
-
-              <select
-                value={newExpense.day}
-                onChange={(e) =>
-                  setNewExpense({ ...newExpense, day: e.target.value })
-                }
-                style={{
-                  backgroundColor: '#333',
-                  color: '#fff',
-                  border: '1px solid #444',
-                  padding: '8px',
-                  borderRadius: '4px'
-                }}
-              >
-                {[
-                  'Montag',
-                  'Dienstag',
-                  'Mittwoch',
-                  'Donnerstag',
-                  'Freitag',
-                  'Samstag',
-                  'Sonntag'
-                ].map((d) => (
+                {daysInCurrentMonth.map((d) => (
                   <option key={d} value={d}>
-                    {d}
+                    {d}. Tag
                   </option>
                 ))}
               </select>
 
+              {/* Kategorie auswählen */}
               <select
                 value={newExpense.category}
                 onChange={(e) =>
@@ -677,6 +673,7 @@ export default function App() {
                 <option value="Sonstiges">Sonstiges</option>
               </select>
 
+              {/* Betrag */}
               <input
                 type="number"
                 placeholder="Betrag (Fr.)"
@@ -736,7 +733,6 @@ export default function App() {
                     }}
                   >
                     <th style={{ padding: '8px' }}>Monat</th>
-                    <th style={{ padding: '8px' }}>Woche</th>
                     <th style={{ padding: '8px' }}>Tag</th>
                     <th style={{ padding: '8px' }}>Kategorie</th>
                     <th style={{ padding: '8px' }}>Betrag</th>
@@ -750,8 +746,7 @@ export default function App() {
                       style={{ borderBottom: '1px solid #2d2d2d' }}
                     >
                       <td style={{ padding: '8px' }}>{exp.month}</td>
-                      <td style={{ padding: '8px' }}>Woche {exp.week}</td>
-                      <td style={{ padding: '8px' }}>{exp.day}</td>
+                      <td style={{ padding: '8px' }}>{exp.day}.</td>
                       <td style={{ padding: '8px' }}>{exp.category}</td>
                       <td
                         style={{
@@ -784,7 +779,7 @@ export default function App() {
         )}
       </main>
 
-      {/* FOOTER TAB-BAR */}
+      {/* FOOTER */}
       <footer
         style={{
           backgroundColor: '#252526',
