@@ -62,15 +62,16 @@ export default function App() {
     return saved
       ? JSON.parse(saved)
       : [
-          { id: 1, month: 'August', day: 31, amount: 100, category: 'Food/Drinks' }
+          { id: 1, month: 'August', day: 25, amount: 139, category: 'Einkäufe', description: 'Migros Einkäufe' }
         ];
   });
 
   const [newExpense, setNewExpense] = useState({
     month: 'August',
-    day: 31,
+    day: 25,
     amount: '',
-    category: 'Food/Drinks'
+    category: 'Einkäufe',
+    description: ''
   });
 
   // MONATSNAMEN
@@ -135,7 +136,7 @@ export default function App() {
       ...expenses,
       { ...newExpense, id: Date.now(), amount: Number(newExpense.amount) }
     ]);
-    setNewExpense({ ...newExpense, amount: '' });
+    setNewExpense({ ...newExpense, amount: '', description: '' });
   };
 
   const deleteExpense = (id) => {
@@ -183,6 +184,7 @@ export default function App() {
       Monat: exp.month,
       Tag: `Tag ${exp.day}`,
       Kategorie: exp.category,
+      Beschreibung: exp.description || '-',
       'Betrag (Fr.)': exp.amount
     }));
     const wsAusgaben = XLSX.utils.json_to_sheet(formattedExpenses);
@@ -689,6 +691,24 @@ export default function App() {
                 }}
               />
 
+              {/* Beschreibung */}
+              <input
+                type="text"
+                placeholder="Beschreibung (z.B. Kopfhörer)"
+                value={newExpense.description}
+                onChange={(e) =>
+                  setNewExpense({ ...newExpense, description: e.target.value })
+                }
+                style={{
+                  backgroundColor: '#333',
+                  color: '#fff',
+                  border: '1px solid #444',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  width: '200px'
+                }}
+              />
+
               <button
                 onClick={addExpense}
                 style={{
@@ -733,6 +753,7 @@ export default function App() {
                     <th style={{ padding: '8px' }}>Monat</th>
                     <th style={{ padding: '8px' }}>Tag</th>
                     <th style={{ padding: '8px' }}>Kategorie</th>
+                    <th style={{ padding: '8px' }}>Beschreibung</th>
                     <th style={{ padding: '8px' }}>Betrag</th>
                     <th style={{ padding: '8px' }}>Aktion</th>
                   </tr>
@@ -746,6 +767,9 @@ export default function App() {
                       <td style={{ padding: '8px' }}>{exp.month}</td>
                       <td style={{ padding: '8px' }}>{exp.day}.</td>
                       <td style={{ padding: '8px' }}>{exp.category}</td>
+                      <td style={{ padding: '8px', color: '#ccc' }}>
+                        {exp.description || '-'}
+                      </td>
                       <td
                         style={{
                           padding: '8px',
