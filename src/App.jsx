@@ -6,6 +6,15 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('Sparen');
   const [isSaved, setIsSaved] = useState(false);
 
+  // MONATSNAMEN
+  const monthNames = [
+    'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
+  ];
+
+  // Aktueller Monat als Standard
+  const currentMonthName = monthNames[new Date().getMonth()];
+
   // --- SPAREN STATE WITH LOCALSTORAGE ---
   const [savingsData, setSavingsData] = useState(() => {
     const saved = localStorage.getItem('finanz_savings');
@@ -66,6 +75,8 @@ export default function App() {
         ];
   });
 
+  const [selectedMonthView, setSelectedMonthView] = useState('August');
+
   const [newExpense, setNewExpense] = useState({
     month: 'August',
     day: 25,
@@ -73,12 +84,6 @@ export default function App() {
     category: 'Einkäufe',
     description: ''
   });
-
-  // MONATSNAMEN
-  const monthNames = [
-    'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
-    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
-  ];
 
   // BERECHNET DIE ANZAHL TAGE DES MONATS AUTOMATISCH
   const getDaysInMonth = (monthName) => {
@@ -88,13 +93,14 @@ export default function App() {
     return new Date(year, monthIndex + 1, 0).getDate();
   };
 
-  // MONATSWECHSEL: SHIFTET DEN TAG AUTOMATISCH AUF DEN LETZTEN TAG DES NEUEN MONATS
+  // MONATSWECHSEL
   const handleMonthChange = (selectedMonth) => {
     const maxDays = getDaysInMonth(selectedMonth);
+    setSelectedMonthView(selectedMonth);
     setNewExpense({
       ...newExpense,
       month: selectedMonth,
-      day: maxDays
+      day: Math.min(newExpense.day, maxDays)
     });
   };
 
@@ -143,8 +149,25 @@ export default function App() {
     setExpenses(expenses.filter((e) => e.id !== id));
   };
 
-  // BERECHNUNG DER TATSÄCHLICHEN AUSGABEN PRO KATEGORIE
-  const actualSpent = expenses.reduce(
+  // LOGIK FÜR BUDGET-PERIODEN (AB DEM 25. DES MONATS RESETET SICH DAS BUDGET)
+  // Das Budget eines Monats beinhaltet:
+  // - Ausgaben vom 25. des Vormonats bis Ende des Vormonats
+  // - Ausgaben vom 1. bis 24. des ausgewählten Monats
+  const getPrevMonth = (currMonth) => {
+    const idx = monthNames.indexOf(currMonth);
+    return idx === 0 ? monthNames[11] : monthNames[idx - 1];
+  };
+
+  const prevMonth = getPrevMonth(selectedMonthView);
+
+  const budgetExpenses = expenses.filter((exp) => {
+    if (exp.month === prevMonth && exp.day >= 25) return true;
+    if (exp.month === selectedMonthView && exp.day < 25) return true;
+    return false;
+  });
+
+  // BERECHNUNG DER TATSÄCHLICHEN AUSGABEN FÜR DIE DIESE BUDGETPERIODE
+  const actualSpent = budgetExpenses.reduce(
     (acc, exp) => {
       const amt = Number(exp.amount) || 0;
       if (exp.category === 'Food/Drinks') acc.foodDrinks += amt;
@@ -163,9 +186,12 @@ export default function App() {
 
   const totalAusgabenPlan =
     Number(budget.foodDrinks) + Number(budget.einkaeufe) + Number(budget.seite);
-  
-  // Reines Sparen = Lohn abzüglich der tatsächlich getätigten/geplanten Gesamtausgaben
   const reinesSparen = Number(budget.lohn) - totalAusgabenPlan;
+
+  // AUSGABEN NURFÜR DEN AKTUELL AUSGEWÄHLTEN MONAT ANZEIGEN
+  const filteredExpensesForMonth = expenses.filter(
+    (exp) => exp.month === selectedMonthView
+  );
 
   // EXPORT FUNKTION
   const exportToExcel = () => {
@@ -213,13 +239,10 @@ export default function App() {
     const wsAusgaben = XLSX.utils.json_to_sheet(formattedExpenses);
     XLSX.utils.book_append_sheet(wb, wsAusgaben, 'Ausgaben');
 
-    const currentMonth = monthNames[new Date().getMonth()];
-    const fileName = `Finanzen-${currentMonth}.xlsx`;
-
+    const fileName = `Finanzen-${selectedMonthView}.xlsx`;
     XLSX.writeFile(wb, fileName);
   };
 
-  // Tage-Array für den ausgewählten Monat generieren
   const daysInCurrentMonth = Array.from(
     { length: getDaysInMonth(newExpense.month) },
     (_, i) => i + 1
@@ -441,7 +464,10 @@ export default function App() {
         {/* REITER: BUDGET */}
         {activeTab === 'Budget' && (
           <div>
-            <h2>Monatliche Budgetplanung</h2>
+            <h2>Monatliche Budgetplanung ({selectedMonthView})</h2>
+            <p style={{ fontSize: '12px', color: '#aaa', marginTop: '-10px', marginBottom: '15px' }}>
+              * Budget-Periode berechnet Ausgaben vom 25. {prevMonth} bis zum 24. {selectedMonthView}.
+            </p>
             <div
               style={{
                 backgroundColor: '#252526',
@@ -649,14 +675,15 @@ export default function App() {
             >
               {/* Monat auswählen */}
               <select
-                value={newExpense.month}
+                value={selectedMonthView}
                 onChange={(e) => handleMonthChange(e.target.value)}
                 style={{
                   backgroundColor: '#333',
                   color: '#fff',
                   border: '1px solid #444',
                   padding: '8px',
-                  borderRadius: '4px'
+                  borderRadius: '4px',
+                  fontWeight: 'bold'
                 }}
               >
                 {monthNames.map((m) => (
@@ -764,7 +791,7 @@ export default function App() {
               </button>
             </div>
 
-            {/* Ausgaben Liste */}
+            {/* Ausgaben Liste gefiltert nach Monat */}
             <div
               style={{
                 backgroundColor: '#252526',
@@ -772,67 +799,76 @@ export default function App() {
                 borderRadius: '8px'
               }}
             >
-              <table
-                style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  textAlign: 'left'
-                }}
-              >
-                <thead>
-                  <tr
-                    style={{
-                      borderBottom: '1px solid #3c3c3c',
-                      color: '#aaa',
-                      fontSize: '13px'
-                    }}
-                  >
-                    <th style={{ padding: '8px' }}>Monat</th>
-                    <th style={{ padding: '8px' }}>Tag</th>
-                    <th style={{ padding: '8px' }}>Kategorie</th>
-                    <th style={{ padding: '8px' }}>Beschreibung</th>
-                    <th style={{ padding: '8px' }}>Betrag</th>
-                    <th style={{ padding: '8px' }}>Aktion</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {expenses.map((exp) => (
+              <h3 style={{ marginTop: 0, marginBottom: '15px', fontSize: '16px', color: '#107c41' }}>
+                Ausgaben im Monat: {selectedMonthView}
+              </h3>
+              {filteredExpensesForMonth.length === 0 ? (
+                <div style={{ color: '#aaa', fontStyle: 'italic', padding: '10px 0' }}>
+                  Keine Ausgaben für {selectedMonthView} eingetragen.
+                </div>
+              ) : (
+                <table
+                  style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    textAlign: 'left'
+                  }}
+                >
+                  <thead>
                     <tr
-                      key={exp.id}
-                      style={{ borderBottom: '1px solid #2d2d2d' }}
+                      style={{
+                        borderBottom: '1px solid #3c3c3c',
+                        color: '#aaa',
+                        fontSize: '13px'
+                      }}
                     >
-                      <td style={{ padding: '8px' }}>{exp.month}</td>
-                      <td style={{ padding: '8px' }}>{exp.day}.</td>
-                      <td style={{ padding: '8px' }}>{exp.category}</td>
-                      <td style={{ padding: '8px', color: '#ccc' }}>
-                        {exp.description || '-'}
-                      </td>
-                      <td
-                        style={{
-                          padding: '8px',
-                          color: '#f44336',
-                          fontWeight: 'bold'
-                        }}
+                      <th style={{ padding: '8px' }}>Monat</th>
+                      <th style={{ padding: '8px' }}>Tag</th>
+                      <th style={{ padding: '8px' }}>Kategorie</th>
+                      <th style={{ padding: '8px' }}>Beschreibung</th>
+                      <th style={{ padding: '8px' }}>Betrag</th>
+                      <th style={{ padding: '8px' }}>Aktion</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredExpensesForMonth.map((exp) => (
+                      <tr
+                        key={exp.id}
+                        style={{ borderBottom: '1px solid #2d2d2d' }}
                       >
-                        -{exp.amount} Fr.
-                      </td>
-                      <td style={{ padding: '8px' }}>
-                        <button
-                          onClick={() => deleteExpense(exp.id)}
+                        <td style={{ padding: '8px' }}>{exp.month}</td>
+                        <td style={{ padding: '8px' }}>{exp.day}.</td>
+                        <td style={{ padding: '8px' }}>{exp.category}</td>
+                        <td style={{ padding: '8px', color: '#ccc' }}>
+                          {exp.description || '-'}
+                        </td>
+                        <td
                           style={{
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            color: '#aaa',
-                            cursor: 'pointer'
+                            padding: '8px',
+                            color: '#f44336',
+                            fontWeight: 'bold'
                           }}
                         >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          -{exp.amount} Fr.
+                        </td>
+                        <td style={{ padding: '8px' }}>
+                          <button
+                            onClick={() => deleteExpense(exp.id)}
+                            style={{
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              color: '#aaa',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         )}
