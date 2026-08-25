@@ -62,13 +62,13 @@ export default function App() {
     return saved
       ? JSON.parse(saved)
       : [
-          { id: 1, month: 'August', day: 1, amount: 100, category: 'Food/Drinks' }
+          { id: 1, month: 'August', day: 31, amount: 100, category: 'Food/Drinks' }
         ];
   });
 
   const [newExpense, setNewExpense] = useState({
     month: 'August',
-    day: 1,
+    day: 31,
     amount: '',
     category: 'Food/Drinks'
   });
@@ -79,23 +79,21 @@ export default function App() {
     'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
   ];
 
-  // HILFSFUNKTION: BERECHNET DIE ANZAHL TAGE IM EINGESTELLTEN MONAT
+  // BERECHNET DIE ANZAHL TAGE DES MONATS AUTOMATISCH
   const getDaysInMonth = (monthName) => {
     const monthIndex = monthNames.indexOf(monthName);
     if (monthIndex === -1) return 31;
-    // Nutzen JavaScript Date-Objekt (Jahr 2026 als Basis)
     const year = new Date().getFullYear();
     return new Date(year, monthIndex + 1, 0).getDate();
   };
 
-  // Wenn der Monat geändert wird, prüfen ob der gewählte Tag noch gültig ist
+  // MONATSWECHSEL: SHIFTET DEN TAG AUTOMATISCH AUF DEN LETZTEN TAG DES NEUEN MONATS
   const handleMonthChange = (selectedMonth) => {
     const maxDays = getDaysInMonth(selectedMonth);
-    const updatedDay = newExpense.day > maxDays ? maxDays : newExpense.day;
     setNewExpense({
       ...newExpense,
       month: selectedMonth,
-      day: updatedDay
+      day: maxDays
     });
   };
 
@@ -196,7 +194,7 @@ export default function App() {
     XLSX.writeFile(wb, fileName);
   };
 
-  // Tage-Array für den ausgewählten Monat generieren (z.B. [1, 2, ..., 30])
+  // Tage-Array für den ausgewählten Monat generieren
   const daysInCurrentMonth = Array.from(
     { length: getDaysInMonth(newExpense.month) },
     (_, i) => i + 1
