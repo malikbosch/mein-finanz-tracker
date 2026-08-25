@@ -53,7 +53,7 @@ export default function App() {
     const saved = localStorage.getItem('finanz_budget');
     return saved
       ? JSON.parse(saved)
-      : { lohn: 840, foodDrinks: 140, einkaeufe: 200, seite: 100 };
+      : { lohn: 828, foodDrinks: 140, einkaeufe: 200, seite: 100 };
   });
 
   // --- AUSGABEN STATE WITH LOCALSTORAGE ---
@@ -115,7 +115,7 @@ export default function App() {
     setTimeout(() => setIsSaved(false), 2000);
   };
 
-  // Berechnungen
+  // Berechnungen für Sparraten
   const calculateAccumulatedSavings = (yearEntries) => {
     let runningTotal = 0;
     return yearEntries.map((entry) => {
@@ -143,8 +143,28 @@ export default function App() {
     setExpenses(expenses.filter((e) => e.id !== id));
   };
 
+  // BERECHNUNG DER TATSÄCHLICHEN AUSGABEN PRO KATEGORIE
+  const actualSpent = expenses.reduce(
+    (acc, exp) => {
+      const amt = Number(exp.amount) || 0;
+      if (exp.category === 'Food/Drinks') acc.foodDrinks += amt;
+      else if (exp.category === 'Einkäufe') acc.einkaeufe += amt;
+      else if (exp.category === 'Seite legen') acc.seite += amt;
+      acc.total += amt;
+      return acc;
+    },
+    { foodDrinks: 0, einkaeufe: 0, seite: 0, total: 0 }
+  );
+
+  // Verbleibendes Budget pro Kategorie
+  const remainingFoodDrinks = Number(budget.foodDrinks) - actualSpent.foodDrinks;
+  const remainingEinkaeufe = Number(budget.einkaeufe) - actualSpent.einkaeufe;
+  const remainingSeite = Number(budget.seite) - actualSpent.seite;
+
   const totalAusgabenPlan =
     Number(budget.foodDrinks) + Number(budget.einkaeufe) + Number(budget.seite);
+  
+  // Reines Sparen = Lohn abzüglich der tatsächlich getätigten/geplanten Gesamtausgaben
   const reinesSparen = Number(budget.lohn) - totalAusgabenPlan;
 
   // EXPORT FUNKTION
@@ -170,9 +190,12 @@ export default function App() {
     // 2. Budget Tab
     const budgetArray = [
       { Kategorie: 'Lohn / Einkommen', Betrag: budget.lohn },
-      { Kategorie: 'Food / Drinks', Betrag: budget.foodDrinks },
-      { Kategorie: 'Einkäufe', Betrag: budget.einkaeufe },
-      { Kategorie: 'Seite legen', Betrag: budget.seite },
+      { Kategorie: 'Food / Drinks (Geplant)', Betrag: budget.foodDrinks },
+      { Kategorie: 'Food / Drinks (Verbleibend)', Betrag: remainingFoodDrinks },
+      { Kategorie: 'Einkäufe (Geplant)', Betrag: budget.einkaeufe },
+      { Kategorie: 'Einkäufe (Verbleibend)', Betrag: remainingEinkaeufe },
+      { Kategorie: 'Seite legen (Geplant)', Betrag: budget.seite },
+      { Kategorie: 'Seite legen (Verbleibend)', Betrag: remainingSeite },
       { Kategorie: 'Gesamte Ausgaben Geplant', Betrag: totalAusgabenPlan },
       { Kategorie: 'Restliches Sparen', Betrag: reinesSparen }
     ];
@@ -424,14 +447,14 @@ export default function App() {
                 backgroundColor: '#252526',
                 padding: '20px',
                 borderRadius: '8px',
-                maxWidth: '600px'
+                maxWidth: '650px'
               }}
             >
               <div
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '1fr 1fr',
-                  gap: '15px',
+                  gap: '20px',
                   marginBottom: '20px'
                 }}
               >
@@ -439,9 +462,9 @@ export default function App() {
                   <label
                     style={{
                       display: 'block',
-                      fontSize: '12px',
+                      fontSize: '13px',
                       color: '#aaa',
-                      marginBottom: '5px'
+                      marginBottom: '6px'
                     }}
                   >
                     Einkommen (Lohn)
@@ -462,13 +485,14 @@ export default function App() {
                     }}
                   />
                 </div>
+
                 <div>
                   <label
                     style={{
                       display: 'block',
-                      fontSize: '12px',
+                      fontSize: '13px',
                       color: '#aaa',
-                      marginBottom: '5px'
+                      marginBottom: '6px'
                     }}
                   >
                     Food / Drinks
@@ -491,14 +515,18 @@ export default function App() {
                       borderRadius: '4px'
                     }}
                   />
+                  <div style={{ fontSize: '11px', marginTop: '4px', color: remainingFoodDrinks < 0 ? '#f44336' : '#4ec9b0' }}>
+                    Verbleibend: {remainingFoodDrinks} Fr. (Ausgegeben: {actualSpent.foodDrinks} Fr.)
+                  </div>
                 </div>
+
                 <div>
                   <label
                     style={{
                       display: 'block',
-                      fontSize: '12px',
+                      fontSize: '13px',
                       color: '#aaa',
-                      marginBottom: '5px'
+                      marginBottom: '6px'
                     }}
                   >
                     Einkäufe
@@ -521,14 +549,18 @@ export default function App() {
                       borderRadius: '4px'
                     }}
                   />
+                  <div style={{ fontSize: '11px', marginTop: '4px', color: remainingEinkaeufe < 0 ? '#f44336' : '#4ec9b0' }}>
+                    Verbleibend: {remainingEinkaeufe} Fr. (Ausgegeben: {actualSpent.einkaeufe} Fr.)
+                  </div>
                 </div>
+
                 <div>
                   <label
                     style={{
                       display: 'block',
-                      fontSize: '12px',
+                      fontSize: '13px',
                       color: '#aaa',
-                      marginBottom: '5px'
+                      marginBottom: '6px'
                     }}
                   >
                     Auf die Seite legen
@@ -548,6 +580,9 @@ export default function App() {
                       borderRadius: '4px'
                     }}
                   />
+                  <div style={{ fontSize: '11px', marginTop: '4px', color: remainingSeite < 0 ? '#f44336' : '#4ec9b0' }}>
+                    Verbleibend: {remainingSeite} Fr. (Ausgegeben: {actualSpent.seite} Fr.)
+                  </div>
                 </div>
               </div>
 
@@ -556,16 +591,17 @@ export default function App() {
                   borderTop: '1px solid #3c3c3c',
                   paddingTop: '15px',
                   display: 'flex',
-                  justify: 'space-between'
+                  justify: 'space-between',
+                  gap: '20px'
                 }}
               >
                 <div>
-                  <div style={{ fontSize: '12px', color: '#aaa' }}>
+                  <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '4px' }}>
                     Insgesamt eingeplante Ausgaben:
                   </div>
                   <div
                     style={{
-                      fontSize: '20px',
+                      fontSize: '22px',
                       fontWeight: 'bold',
                       color: '#ce9178'
                     }}
@@ -573,13 +609,14 @@ export default function App() {
                     {totalAusgabenPlan} Fr.
                   </div>
                 </div>
+
                 <div>
-                  <div style={{ fontSize: '12px', color: '#aaa' }}>
+                  <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '4px' }}>
                     Restliches Sparen:
                   </div>
                   <div
                     style={{
-                      fontSize: '20px',
+                      fontSize: '22px',
                       fontWeight: 'bold',
                       color: '#4ec9b0'
                     }}
@@ -629,7 +666,7 @@ export default function App() {
                 ))}
               </select>
 
-              {/* Tag auswählen (1 bis max. Tage des Monats) */}
+              {/* Tag auswählen */}
               <select
                 value={newExpense.day}
                 onChange={(e) =>
