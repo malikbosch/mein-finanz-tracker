@@ -1,0 +1,15 @@
+{
+  "short_name": "Finanzen",
+  "name": "Meine Finanzplanung",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#1e1e1e",
+  "theme_color": "#107c41",
+  "display": "standalone"
+}
