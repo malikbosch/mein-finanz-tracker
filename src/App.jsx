@@ -1,187 +1,260 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Calendar, Wallet, CreditCard, ChevronRight } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { PiggyBank, Calculator, Receipt, Plus, Trash2, Download, Save } from 'lucide-react';
 
-export default function FinanceTracker() {
+export default function App() {
   const [activeTab, setActiveTab] = useState('Sparen');
-  const [selectedMonthView, setSelectedMonthView] = useState('Januar');
+  const [isSaved, setIsSaved] = useState(false);
 
-  // Budget States
-  const [budget, setBudget] = useState(() => {
-    const saved = localStorage.getItem('finance_budget');
-    return saved ? JSON.parse(saved) : { lohn: 0, foodDrinks: 0, einkaeufe: 0, seite: 0 };
-  });
-
-  // Ausgaben States
-  const [expenses, setExpenses] = useState(() => {
-    const saved = localStorage.getItem('finance_expenses');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [newExpense, setNewExpense] = useState({
-    month: 'Januar',
-    day: 1,
-    category: 'Food/Drinks',
-    amount: '',
-    description: ''
-  });
-
-  // Einnahmen States
-  const [incomes, setIncomes] = useState(() => {
-    const saved = localStorage.getItem('finance_incomes');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [newIncome, setNewIncome] = useState({
-    month: 'Januar',
-    day: 1,
-    category: 'Lohn/Bonus',
-    amount: '',
-    description: ''
-  });
-
-  // Save to LocalStorage
-  useEffect(() => {
-    localStorage.setItem('finance_budget', JSON.stringify(budget));
-  }, [budget]);
-
-  useEffect(() => {
-    localStorage.setItem('finance_expenses', JSON.stringify(expenses));
-  }, [expenses]);
-
-  useEffect(() => {
-    localStorage.setItem('finance_incomes', JSON.stringify(incomes));
-  }, [incomes]);
-
+  // MONATSNAMEN
   const monthNames = [
     'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
     'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
   ];
 
-  // Vorherigen Monat ermitteln
-  const currentMonthIndex = monthNames.indexOf(selectedMonthView);
-  const prevMonthIndex = currentMonthIndex === 0 ? 11 : currentMonthIndex - 1;
-  const prevMonth = monthNames[prevMonthIndex];
+  // Aktueller Monat als Standard
+  const currentMonthName = monthNames[new Date().getMonth()];
 
-  // Tage für ausgewählten Monat
-  const daysInMonthCount = new Date(2026, currentMonthIndex + 1, 0).getDate();
-  const daysInCurrentMonth = Array.from({ length: daysInMonthCount }, (_, i) => i + 1);
+  // --- SPAREN STATE WITH LOCALSTORAGE ---
+  const [savingsData, setSavingsData] = useState(() => {
+    const saved = localStorage.getItem('finanz_savings');
+    return saved
+      ? JSON.parse(saved)
+      : {
+          2026: [
+            { month: 'Juni', savings: 450 },
+            { month: 'Juli', savings: 0 },
+            { month: 'August', savings: 0 },
+            { month: 'September', savings: 0 },
+            { month: 'Oktober', savings: 0 },
+            { month: 'November', savings: 0 },
+            { month: 'Dezember', savings: 0 }
+          ],
+          2027: [
+            { month: 'Januar', savings: 0 },
+            { month: 'Februar', savings: 0 },
+            { month: 'März', savings: 0 },
+            { month: 'April', savings: 0 },
+            { month: 'Mai', savings: 0 },
+            { month: 'Juni', savings: 0 },
+            { month: 'Juli', savings: 0 },
+            { month: 'August', savings: 0 },
+            { month: 'September', savings: 0 },
+            { month: 'Oktober', savings: 0 },
+            { month: 'November', savings: 0 },
+            { month: 'Dezember', savings: 0 }
+          ],
+          2028: [
+            { month: 'Januar', savings: 0 },
+            { month: 'Februar', savings: 0 },
+            { month: 'März', savings: 0 },
+            { month: 'April', savings: 0 },
+            { month: 'Mai', savings: 0 },
+            { month: 'Juni', savings: 0 },
+            { month: 'Juli', savings: 0 },
+            { month: 'August', savings: 0 }
+          ]
+        };
+  });
 
-  // Monat wechseln
-  const handleMonthChange = (month) => {
-    setSelectedMonthView(month);
-    setNewExpense((prev) => ({ ...prev, month: month }));
-    setNewIncome((prev) => ({ ...prev, month: month }));
+  // --- BUDGET STATE WITH LOCALSTORAGE ---
+  const [budget, setBudget] = useState(() => {
+    const saved = localStorage.getItem('finanz_budget');
+    return saved
+      ? JSON.parse(saved)
+      : { lohn: 828, foodDrinks: 140, einkaeufe: 200, seite: 100 };
+  });
+
+  // --- AUSGABEN STATE WITH LOCALSTORAGE ---
+  const [expenses, setExpenses] = useState(() => {
+    const saved = localStorage.getItem('finanz_expenses');
+    return saved
+      ? JSON.parse(saved)
+      : [
+          { id: 1, month: 'August', day: 25, amount: 139, category: 'Einkäufe', description: 'Migros Einkäufe' }
+        ];
+  });
+
+  const [selectedMonthView, setSelectedMonthView] = useState('August');
+
+  const [newExpense, setNewExpense] = useState({
+    month: 'August',
+    day: 25,
+    amount: '',
+    category: 'Einkäufe',
+    description: ''
+  });
+
+  // BERECHNET DIE ANZAHL TAGE DES MONATS AUTOMATISCH
+  const getDaysInMonth = (monthName) => {
+    const monthIndex = monthNames.indexOf(monthName);
+    if (monthIndex === -1) return 31;
+    const year = new Date().getFullYear();
+    return new Date(year, monthIndex + 1, 0).getDate();
   };
 
-  // Ausgaben hinzufügen
-  const addExpense = () => {
-    if (!newExpense.amount || isNaN(newExpense.amount)) return;
-    const expenseToAdd = {
-      ...newExpense,
-      id: Date.now(),
-      amount: Number(newExpense.amount),
-      day: Number(newExpense.day)
-    };
-    setExpenses([...expenses, expenseToAdd]);
+  // MONATSWECHSEL
+  const handleMonthChange = (selectedMonth) => {
+    const maxDays = getDaysInMonth(selectedMonth);
+    setSelectedMonthView(selectedMonth);
     setNewExpense({
       ...newExpense,
-      amount: '',
-      description: ''
+      month: selectedMonth,
+      day: Math.min(newExpense.day, maxDays)
     });
   };
 
-  // Ausgabe löschen
+  // AUTOMATISCHES SPEICHERN IM HINTERGRUND
+  useEffect(() => {
+    localStorage.setItem('finanz_savings', JSON.stringify(savingsData));
+    localStorage.setItem('finanz_budget', JSON.stringify(budget));
+    localStorage.setItem('finanz_expenses', JSON.stringify(expenses));
+  }, [savingsData, budget, expenses]);
+
+  // MANUELLES SPEICHERN FUNKTION
+  const handleManualSave = () => {
+    localStorage.setItem('finanz_savings', JSON.stringify(savingsData));
+    localStorage.setItem('finanz_budget', JSON.stringify(budget));
+    localStorage.setItem('finanz_expenses', JSON.stringify(expenses));
+
+    setIsSaved(true);
+    setTimeout(() => setIsSaved(false), 2000);
+  };
+
+  // Berechnungen für Sparraten
+  const calculateAccumulatedSavings = (yearEntries) => {
+    let runningTotal = 0;
+    return yearEntries.map((entry) => {
+      runningTotal += Number(entry.savings) || 0;
+      return { ...entry, endOfMonth: runningTotal };
+    });
+  };
+
+  const handleSavingChange = (year, index, value) => {
+    const updatedYear = [...savingsData[year]];
+    updatedYear[index].savings = Number(value) || 0;
+    setSavingsData({ ...savingsData, [year]: updatedYear });
+  };
+
+  const addExpense = () => {
+    if (!newExpense.amount) return;
+    setExpenses([
+      ...expenses,
+      { ...newExpense, id: Date.now(), amount: Number(newExpense.amount) }
+    ]);
+    setNewExpense({ ...newExpense, amount: '', description: '' });
+  };
+
   const deleteExpense = (id) => {
-    setExpenses(expenses.filter((exp) => exp.id !== id));
+    setExpenses(expenses.filter((e) => e.id !== id));
   };
 
-  // Einnahmen hinzufügen
-  const addIncome = () => {
-    if (!newIncome.amount || isNaN(newIncome.amount)) return;
-    const incomeToAdd = {
-      ...newIncome,
-      id: Date.now(),
-      amount: Number(newIncome.amount),
-      day: Number(newIncome.day)
-    };
-    setIncomes([...incomes, incomeToAdd]);
-    setNewIncome({
-      ...newIncome,
-      amount: '',
-      description: ''
-    });
+  // LOGIK FÜR BUDGET-PERIODEN (AB DEM 25. DES MONATS RESETET SICH DAS BUDGET)
+  // Das Budget eines Monats beinhaltet:
+  // - Ausgaben vom 25. des Vormonats bis Ende des Vormonats
+  // - Ausgaben vom 1. bis 24. des ausgewählten Monats
+  const getPrevMonth = (currMonth) => {
+    const idx = monthNames.indexOf(currMonth);
+    return idx === 0 ? monthNames[11] : monthNames[idx - 1];
   };
 
-  // Einnahme löschen
-  const deleteIncome = (id) => {
-    setIncomes(incomes.filter((inc) => inc.id !== id));
-  };
+  const prevMonth = getPrevMonth(selectedMonthView);
 
-  // Ausgaben filtern nach Periode (25. des Vormonats bis 24. des aktuellen Monats)
-  const filteredExpensesForMonth = expenses.filter((exp) => {
+  const budgetExpenses = expenses.filter((exp) => {
     if (exp.month === prevMonth && exp.day >= 25) return true;
-    if (exp.month === selectedMonthView && exp.day <= 24) return true;
+    if (exp.month === selectedMonthView && exp.day < 25) return true;
     return false;
   });
 
-  // Einnahmen filtern nach Periode (25. des Vormonats bis 24. des aktuellen Monats)
-  const filteredIncomesForMonth = incomes.filter((inc) => {
-    if (inc.month === prevMonth && inc.day >= 25) return true;
-    if (inc.month === selectedMonthView && inc.day <= 24) return true;
-    return false;
-  });
-
-  // Tatsächliche Ausgaben Berechnen
-  const actualSpent = filteredExpensesForMonth.reduce(
+  // BERECHNUNG DER TATSÄCHLICHEN AUSGABEN FÜR DIE DIESE BUDGETPERIODE
+  const actualSpent = budgetExpenses.reduce(
     (acc, exp) => {
-      if (exp.category === 'Food/Drinks') acc.foodDrinks += exp.amount;
-      if (exp.category === 'Einkäufe') acc.einkaeufe += exp.amount;
-      if (exp.category === 'Seite legen') acc.seite += exp.amount;
+      const amt = Number(exp.amount) || 0;
+      if (exp.category === 'Food/Drinks') acc.foodDrinks += amt;
+      else if (exp.category === 'Einkäufe') acc.einkaeufe += amt;
+      else if (exp.category === 'Seite legen') acc.seite += amt;
+      acc.total += amt;
       return acc;
     },
-    { foodDrinks: 0, einkaeufe: 0, seite: 0 }
+    { foodDrinks: 0, einkaeufe: 0, seite: 0, total: 0 }
   );
 
-  // Tatsächliche Einnahmen Berechnen
-  const actualIncomeTotal = filteredIncomesForMonth.reduce(
-    (acc, inc) => acc + inc.amount,
-    0
+  // Verbleibendes Budget pro Kategorie
+  const remainingFoodDrinks = Number(budget.foodDrinks) - actualSpent.foodDrinks;
+  const remainingEinkaeufe = Number(budget.einkaeufe) - actualSpent.einkaeufe;
+  const remainingSeite = Number(budget.seite) - actualSpent.seite;
+
+  const totalAusgabenPlan =
+    Number(budget.foodDrinks) + Number(budget.einkaeufe) + Number(budget.seite);
+  const reinesSparen = Number(budget.lohn) - totalAusgabenPlan;
+
+  // AUSGABEN NURFÜR DEN AKTUELL AUSGEWÄHLTEN MONAT ANZEIGEN
+  const filteredExpensesForMonth = expenses.filter(
+    (exp) => exp.month === selectedMonthView
   );
 
-  // Verbleibendes Budget
-  const remainingFoodDrinks = budget.foodDrinks - actualSpent.foodDrinks;
-  const remainingEinkaeufe = budget.einkaeufe - actualSpent.einkaeufe;
-  const remainingSeite = budget.seite - actualSpent.seite;
+  // EXPORT FUNKTION
+  const exportToExcel = () => {
+    const wb = XLSX.utils.book_new();
 
-  // Effetiver Gesamteinkommen-Wert inklusive der eingetragenen Plus-Einnahmen
-  const totalIncomeEffective = budget.lohn + actualIncomeTotal;
-
-  // Berechnungen
-  const totalAusgabenPlan = budget.foodDrinks + budget.einkaeufe + budget.seite;
-  const reinesSparen = totalIncomeEffective - totalAusgabenPlan;
-
-  // Sparen Übersicht Daten Generieren
-  const generateSavingsData = () => {
-    let cumulativeSavings = 0;
-    return monthNames.map((m) => {
-      cumulativeSavings += reinesSparen;
-      return {
-        month: m,
-        monthly: reinesSparen,
-        endOfMonth: cumulativeSavings
-      };
+    // 1. Sparen Tab
+    const flattenSavings = [];
+    Object.keys(savingsData).forEach((year) => {
+      const yearWithTotals = calculateAccumulatedSavings(savingsData[year]);
+      yearWithTotals.forEach((item) => {
+        flattenSavings.push({
+          Jahr: year,
+          Monat: item.month,
+          'Sparrate (Fr.)': item.savings,
+          'End of Month (Fr.)': item.endOfMonth
+        });
+      });
     });
+    const wsSparen = XLSX.utils.json_to_sheet(flattenSavings);
+    XLSX.utils.book_append_sheet(wb, wsSparen, 'Sparen');
+
+    // 2. Budget Tab
+    const budgetArray = [
+      { Kategorie: 'Lohn / Einkommen', Betrag: budget.lohn },
+      { Kategorie: 'Food / Drinks (Geplant)', Betrag: budget.foodDrinks },
+      { Kategorie: 'Food / Drinks (Verbleibend)', Betrag: remainingFoodDrinks },
+      { Kategorie: 'Einkäufe (Geplant)', Betrag: budget.einkaeufe },
+      { Kategorie: 'Einkäufe (Verbleibend)', Betrag: remainingEinkaeufe },
+      { Kategorie: 'Seite legen (Geplant)', Betrag: budget.seite },
+      { Kategorie: 'Seite legen (Verbleibend)', Betrag: remainingSeite },
+      { Kategorie: 'Gesamte Ausgaben Geplant', Betrag: totalAusgabenPlan },
+      { Kategorie: 'Restliches Sparen', Betrag: reinesSparen }
+    ];
+    const wsBudget = XLSX.utils.json_to_sheet(budgetArray);
+    XLSX.utils.book_append_sheet(wb, wsBudget, 'Budget');
+
+    // 3. Ausgaben Tab
+    const formattedExpenses = expenses.map((exp) => ({
+      Monat: exp.month,
+      Tag: `Tag ${exp.day}`,
+      Kategorie: exp.category,
+      Beschreibung: exp.description || '-',
+      'Betrag (Fr.)': exp.amount
+    }));
+    const wsAusgaben = XLSX.utils.json_to_sheet(formattedExpenses);
+    XLSX.utils.book_append_sheet(wb, wsAusgaben, 'Ausgaben');
+
+    const fileName = `Finanzen-${selectedMonthView}.xlsx`;
+    XLSX.writeFile(wb, fileName);
   };
 
-  const savingsData = generateSavingsData();
+  const daysInCurrentMonth = Array.from(
+    { length: getDaysInMonth(newExpense.month) },
+    (_, i) => i + 1
+  );
 
   return (
     <div
       style={{
-        backgroundColor: '#1e1e1e',
-        color: '#d4d4d4',
-        minHeight: '100vh',
         fontFamily: 'Segoe UI, sans-serif',
+        backgroundColor: '#1e1e1e',
+        color: '#f1f1f1',
+        minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column'
       }}
@@ -190,96 +263,191 @@ export default function FinanceTracker() {
       <header
         style={{
           backgroundColor: '#2d2d2d',
-          padding: '15px 20px',
           borderBottom: '1px solid #3c3c3c',
+          padding: '12px 20px',
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
+          justify: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '10px'
         }}
       >
-        <h1 style={{ margin: 0, fontSize: '20px', color: '#4ec9b0' }}>
-          Finanz-Tracker
-        </h1>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button
             onClick={() => setActiveTab('Sparen')}
             style={{
               padding: '8px 16px',
-              backgroundColor: activeTab === 'Sparen' ? '#107c41' : '#3c3c3c',
-              color: '#fff',
+              borderRadius: '6px',
               border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
+              backgroundColor: activeTab === 'Sparen' ? '#107c41' : '#3c3c3c',
+              color: 'white',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
             }}
           >
-            Sparen
+            <PiggyBank size={18} /> Sparen
           </button>
           <button
             onClick={() => setActiveTab('Budget')}
             style={{
               padding: '8px 16px',
+              borderRadius: '6px',
+              border: 'none',
               backgroundColor: activeTab === 'Budget' ? '#107c41' : '#3c3c3c',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
+              color: 'white',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
             }}
           >
-            Budget
-          </button>
-          <button
-            onClick={() => setActiveTab('Einnahmen')}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: activeTab === 'Einnahmen' ? '#107c41' : '#3c3c3c',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Einnahmen
+            <Calculator size={18} /> Budget
           </button>
           <button
             onClick={() => setActiveTab('Ausgaben')}
             style={{
               padding: '8px 16px',
-              backgroundColor: activeTab === 'Ausgaben' ? '#107c41' : '#3c3c3c',
-              color: '#fff',
+              borderRadius: '6px',
               border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
+              backgroundColor: activeTab === 'Ausgaben' ? '#107c41' : '#3c3c3c',
+              color: 'white',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
             }}
           >
-            Ausgaben
+            <Receipt size={18} /> Ausgaben
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button
+            onClick={handleManualSave}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: isSaved ? '#28a745' : '#2563eb',
+              color: 'white',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'background-color 0.2s'
+            }}
+          >
+            <Save size={18} /> {isSaved ? 'Gespeichert! ✓' : 'Speichern'}
+          </button>
+
+          <button
+            onClick={exportToExcel}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: '#0e639c',
+              color: 'white',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <Download size={18} /> Excel Exportieren
           </button>
         </div>
       </header>
 
       {/* CONTENT AREA */}
-      <main style={{ padding: '20px', flex: 1 }}>
+      <main style={{ padding: '20px', flex: 1, overflowX: 'auto' }}>
         {/* REITER: SPAREN */}
         {activeTab === 'Sparen' && (
           <div>
-            <h2>Ersparnisse Übersicht</h2>
-            <div
-              style={{
-                backgroundColor: '#252526',
-                padding: '15px',
-                borderRadius: '8px',
-                overflowX: 'auto'
-              }}
-            >
-              {savingsData.map((row) => {
+            <h2>Gespartes Guthaben Übersicht</h2>
+            <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
+              {Object.keys(savingsData).map((year) => {
+                const yearDataWithTotals = calculateAccumulatedSavings(
+                  savingsData[year]
+                );
                 return (
-                  <div key={row.month}>
-                    <table>
+                  <div
+                    key={year}
+                    style={{
+                      backgroundColor: '#252526',
+                      padding: '15px',
+                      borderRadius: '8px',
+                      minWidth: '280px'
+                    }}
+                  >
+                    <h3
+                      style={{
+                        textAlign: 'center',
+                        color: '#107c41',
+                        borderBottom: '1px solid #3c3c3c',
+                        paddingBottom: '8px'
+                      }}
+                    >
+                      {year}
+                    </h3>
+                    <table
+                      style={{
+                        width: '100%',
+                        borderCollapse: 'collapse',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <thead>
+                        <tr
+                          style={{
+                            borderBottom: '1px solid #3c3c3c',
+                            fontSize: '12px',
+                            color: '#aaa'
+                          }}
+                        >
+                          <th style={{ padding: '6px' }}>Monat</th>
+                          <th style={{ padding: '6px' }}>Sparrate (Fr.)</th>
+                          <th style={{ padding: '6px' }}>End of Month</th>
+                        </tr>
+                      </thead>
                       <tbody>
-                        {savingsData.map((row) => (
-                          <tr key={row.month}>
-                            <td>{row.month}</td>
-                            <td>{row.monthly} Fr.</td>
-                            <td>
+                        {yearDataWithTotals.map((row, idx) => (
+                          <tr
+                            key={row.month}
+                            style={{ borderBottom: '1px solid #2d2d2d' }}
+                          >
+                            <td style={{ padding: '6px' }}>{row.month}</td>
+                            <td style={{ padding: '6px' }}>
+                              <input
+                                type="number"
+                                value={row.savings}
+                                onChange={(e) =>
+                                  handleSavingChange(year, idx, e.target.value)
+                                }
+                                style={{
+                                  width: '70px',
+                                  backgroundColor: '#333',
+                                  color: '#fff',
+                                  border: '1px solid #444',
+                                  borderRadius: '4px',
+                                  padding: '2px 5px'
+                                }}
+                              />
+                            </td>
+                            <td
+                              style={{
+                                padding: '6px',
+                                fontWeight: 'bold',
+                                color: '#4ec9b0'
+                              }}
+                            >
                               {row.endOfMonth} Fr.
                             </td>
                           </tr>
@@ -298,7 +466,7 @@ export default function FinanceTracker() {
           <div>
             <h2>Monatliche Budgetplanung ({selectedMonthView})</h2>
             <p style={{ fontSize: '12px', color: '#aaa', marginTop: '-10px', marginBottom: '15px' }}>
-              * Budget-Periode berechnet Ausgaben und Einnahmen vom 25. {prevMonth} bis zum 24. {selectedMonthView}.
+              * Budget-Periode berechnet Ausgaben vom 25. {prevMonth} bis zum 24. {selectedMonthView}.
             </p>
             <div
               style={{
@@ -342,9 +510,6 @@ export default function FinanceTracker() {
                       borderRadius: '4px'
                     }}
                   />
-                  <div style={{ fontSize: '11px', marginTop: '4px', color: '#4ec9b0' }}>
-                    Gesamt (inkl. Einnahmen): {totalIncomeEffective} Fr. (Zusätzlich: +{actualIncomeTotal} Fr.)
-                  </div>
                 </div>
 
                 <div>
@@ -486,224 +651,6 @@ export default function FinanceTracker() {
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* REITER: EINNAHMEN */}
-        {activeTab === 'Einnahmen' && (
-          <div>
-            <h2>Einnahmen Eintragen & Verwalten</h2>
-
-            {/* Formular zum Hinzufügen */}
-            <div
-              style={{
-                backgroundColor: '#252526',
-                padding: '15px',
-                borderRadius: '8px',
-                marginBottom: '20px',
-                display: 'flex',
-                gap: '10px',
-                flexWrap: 'wrap',
-                alignItems: 'center'
-              }}
-            >
-              {/* Monat auswählen */}
-              <select
-                value={selectedMonthView}
-                onChange={(e) => handleMonthChange(e.target.value)}
-                style={{
-                  backgroundColor: '#333',
-                  color: '#fff',
-                  border: '1px solid #444',
-                  padding: '8px',
-                  borderRadius: '4px',
-                  fontWeight: 'bold'
-                }}
-              >
-                {monthNames.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-
-              {/* Tag auswählen */}
-              <select
-                value={newIncome.day}
-                onChange={(e) =>
-                  setNewIncome({
-                    ...newIncome,
-                    day: Number(e.target.value)
-                  })
-                }
-                style={{
-                  backgroundColor: '#333',
-                  color: '#fff',
-                  border: '1px solid #444',
-                  padding: '8px',
-                  borderRadius: '4px'
-                }}
-              >
-                {daysInCurrentMonth.map((d) => (
-                  <option key={d} value={d}>
-                    {d}. Tag
-                  </option>
-                ))}
-              </select>
-
-              {/* Kategorie auswählen */}
-              <select
-                value={newIncome.category}
-                onChange={(e) =>
-                  setNewIncome({ ...newIncome, category: e.target.value })
-                }
-                style={{
-                  backgroundColor: '#333',
-                  color: '#fff',
-                  border: '1px solid #444',
-                  padding: '8px',
-                  borderRadius: '4px'
-                }}
-              >
-                <option value="Lohn/Bonus">Lohn/Bonus</option>
-                <option value="Geschenk">Geschenk</option>
-                <option value="Rückerstattung">Rückerstattung</option>
-                <option value="Sonstiges">Sonstiges</option>
-              </select>
-
-              {/* Betrag */}
-              <input
-                type="number"
-                placeholder="Betrag (Fr.)"
-                value={newIncome.amount}
-                onChange={(e) =>
-                  setNewIncome({ ...newIncome, amount: e.target.value })
-                }
-                style={{
-                  backgroundColor: '#333',
-                  color: '#fff',
-                  border: '1px solid #444',
-                  padding: '8px',
-                  borderRadius: '4px',
-                  width: '110px'
-                }}
-              />
-
-              {/* Beschreibung */}
-              <input
-                type="text"
-                placeholder="Beschreibung (z.B. Verkauf)"
-                value={newIncome.description}
-                onChange={(e) =>
-                  setNewIncome({ ...newIncome, description: e.target.value })
-                }
-                style={{
-                  backgroundColor: '#333',
-                  color: '#fff',
-                  border: '1px solid #444',
-                  padding: '8px',
-                  borderRadius: '4px',
-                  width: '200px'
-                }}
-              />
-
-              <button
-                onClick={addIncome}
-                style={{
-                  backgroundColor: '#107c41',
-                  color: '#fff',
-                  border: 'none',
-                  padding: '8px 15px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px'
-                }}
-              >
-                <Plus size={16} /> Hinzufügen
-              </button>
-            </div>
-
-            {/* Einnahmen Liste gefiltert nach Monat */}
-            <div
-              style={{
-                backgroundColor: '#252526',
-                padding: '15px',
-                borderRadius: '8px'
-              }}
-            >
-              <h3 style={{ marginTop: 0, marginBottom: '15px', fontSize: '16px', color: '#107c41' }}>
-                Einnahmen im Monat: {selectedMonthView}
-              </h3>
-              {filteredIncomesForMonth.length === 0 ? (
-                <div style={{ color: '#aaa', fontStyle: 'italic', padding: '10px 0' }}>
-                  Keine Einnahmen für {selectedMonthView} eingetragen.
-                </div>
-              ) : (
-                <table
-                  style={{
-                    width: '100%',
-                    borderCollapse: 'collapse',
-                    textAlign: 'left'
-                  }}
-                >
-                  <thead>
-                    <tr
-                      style={{
-                        borderBottom: '1px solid #3c3c3c',
-                        color: '#aaa',
-                        fontSize: '13px'
-                      }}
-                    >
-                      <th style={{ padding: '8px' }}>Monat</th>
-                      <th style={{ padding: '8px' }}>Tag</th>
-                      <th style={{ padding: '8px' }}>Kategorie</th>
-                      <th style={{ padding: '8px' }}>Beschreibung</th>
-                      <th style={{ padding: '8px' }}>Betrag</th>
-                      <th style={{ padding: '8px' }}>Aktion</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredIncomesForMonth.map((inc) => (
-                      <tr
-                        key={inc.id}
-                        style={{ borderBottom: '1px solid #2d2d2d' }}
-                      >
-                        <td style={{ padding: '8px' }}>{inc.month}</td>
-                        <td style={{ padding: '8px' }}>{inc.day}.</td>
-                        <td style={{ padding: '8px' }}>{inc.category}</td>
-                        <td style={{ padding: '8px', color: '#ccc' }}>
-                          {inc.description || '-'}
-                        </td>
-                        <td
-                          style={{
-                            padding: '8px',
-                            color: '#4ec9b0',
-                            fontWeight: 'bold'
-                          }}
-                        >
-                          +{inc.amount} Fr.
-                        </td>
-                        <td style={{ padding: '8px' }}>
-                          <button
-                            onClick={() => deleteIncome(inc.id)}
-                            style={{
-                              backgroundColor: 'transparent',
-                              border: 'none',
-                              color: '#aaa',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
             </div>
           </div>
         )}
@@ -965,21 +912,6 @@ export default function FinanceTracker() {
           }}
         >
           Budget
-        </button>
-        <button
-          onClick={() => setActiveTab('Einnahmen')}
-          style={{
-            padding: '8px 16px',
-            border: 'none',
-            borderTop:
-              activeTab === 'Einnahmen' ? '3px solid #107c41' : 'none',
-            backgroundColor:
-              activeTab === 'Einnahmen' ? '#1e1e1e' : 'transparent',
-            color: activeTab === 'Einnahmen' ? '#fff' : '#aaa',
-            cursor: 'pointer'
-          }}
-        >
-          Einnahmen
         </button>
         <button
           onClick={() => setActiveTab('Ausgaben')}
